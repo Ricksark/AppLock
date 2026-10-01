@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AegisLock</string>
+    <string name="device_admin_description">Enables AegisLock remote wipe and anti-theft protection policies to secure sensitive data if your device is lost or stolen.</string>
+    <string name="applock_service_channel_name">AppLock Active Shield</string>
+    <string name="applock_service_channel_desc">Monitors and protects locked applications in real-time.</string>
+    <string name="accessibility_service_description">Monitors and intercepts foreground application launches in real-time to display the AegisLock authentication screen on Android 10+ devices.</string>
+</resources>

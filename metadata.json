@@ -1,0 +1,6 @@
+{
+  "name": "AegisLock",
+  "description": "Secure App Locker with biometric & custom passcode authentication, AES-256 encrypted photo & document vault, real-time app protection for Android 10+, and remote wipe capabilities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

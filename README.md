@@ -9,6 +9,10 @@ Based on the repository structure, source code, and `metadata.json`, here is a c
 [![Kotlin](https://img.shields.io/badge/kotlin-1.9+-purple)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Compose-✓-green)](https://developer.android.com/jetpack/compose)
 
+# follow now
+[![Instagram](https://img.shields.io/badge/instagram-1.5K+-DD2A7B?style=flat&logo=instagram&logoColor=white)](https://www.instagram.com/_priyangshu_2)
+[![Facebook](https://img.shields.io/badge/Facebook-20-1877F2?style=flat&logo=facebook&logoColor=white)](https://www.facebook.com/mrpriyangshusarkar)
+
 **AegisLock** is a secure Android app locker that protects your sensitive applications and files with military‑grade encryption. It combines biometric authentication, custom passcode fallback, an AES‑256 encrypted vault for photos & documents, real‑time app monitoring, and remote‑wipe capabilities.
 
 ---

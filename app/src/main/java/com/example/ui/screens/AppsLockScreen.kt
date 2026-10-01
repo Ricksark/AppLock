@@ -3,6 +3,8 @@ package com.example.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -12,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,11 +52,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
@@ -76,7 +78,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.AppDatabase
 import com.example.data.AppLockEntity
@@ -102,7 +103,7 @@ data class InstalledAppItem(
     val packageName: String,
     val appName: String,
     val isSensitive: Boolean,
-    val icon: Drawable?
+    val iconBitmap: Bitmap?
 )
 
 @Composable
@@ -133,6 +134,20 @@ fun AppsLockScreen(
         isBatteryOptimized = PermissionUtils.isIgnoringBatteryOptimizations(context)
     }
 
+    // Helper to safely render drawable into a 96x96 bitmap without throwing
+    fun safeDrawableToBitmap(drawable: Drawable?): Bitmap? {
+        if (drawable == null) return null
+        return try {
+            val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            drawable.setBounds(0, 0, 96, 96)
+            drawable.draw(canvas)
+            bitmap
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
     // Load installed applications from PackageManager
     fun loadInstalledApps() {
         scope.launch {
@@ -149,7 +164,7 @@ fun AppsLockScreen(
                     "files", "contact", "phone", "facebook", "instagram", "tiktok"
                 )
 
-                // 1. Query all Launcher Activities
+                // 1. Query Launcher Activities
                 val launcherIntent = Intent(Intent.ACTION_MAIN, null).apply {
                     addCategory(Intent.CATEGORY_LAUNCHER)
                 }
@@ -162,9 +177,9 @@ fun AppsLockScreen(
                         val isSensitive = sensitiveKeywords.any {
                             name.contains(it, ignoreCase = true) || pkg.contains(it, ignoreCase = true)
                         }
-                        val icon = try {
-                            info.loadIcon(pm)
-                        } catch (e: Exception) {
+                        val bmp = try {
+                            safeDrawableToBitmap(info.loadIcon(pm))
+                        } catch (t: Throwable) {
                             null
                         }
                         list.add(
@@ -172,13 +187,13 @@ fun AppsLockScreen(
                                 packageName = pkg,
                                 appName = name,
                                 isSensitive = isSensitive,
-                                icon = icon
+                                iconBitmap = bmp
                             )
                         )
                     }
                 }
 
-                // 2. Query Installed Applications to ensure complete visibility
+                // 2. Query Installed Applications
                 val installedPackages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
                 for (appInfo in installedPackages) {
                     val pkg = appInfo.packageName
@@ -188,9 +203,9 @@ fun AppsLockScreen(
                         val isSensitive = sensitiveKeywords.any {
                             name.contains(it, ignoreCase = true) || pkg.contains(it, ignoreCase = true)
                         }
-                        val icon = try {
-                            appInfo.loadIcon(pm)
-                        } catch (e: Exception) {
+                        val bmp = try {
+                            safeDrawableToBitmap(appInfo.loadIcon(pm))
+                        } catch (t: Throwable) {
                             null
                         }
                         list.add(
@@ -198,13 +213,13 @@ fun AppsLockScreen(
                                 packageName = pkg,
                                 appName = name,
                                 isSensitive = isSensitive,
-                                icon = icon
+                                iconBitmap = bmp
                             )
                         )
                     }
                 }
 
-                // Fallback standard demo apps if device has very few apps installed (e.g. fresh emulators)
+                // Fallback standard demo apps if device has very few apps installed
                 if (list.size < 3) {
                     val defaultPackages = listOf(
                         Triple("com.google.android.apps.photos", "Google Photos", true),
@@ -223,7 +238,7 @@ fun AppsLockScreen(
                                     packageName = pkg,
                                     appName = name,
                                     isSensitive = sensitive,
-                                    icon = null
+                                    iconBitmap = null
                                 )
                             )
                         }
@@ -520,16 +535,18 @@ fun AppsLockScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Filter Chips Row & Batch Action Buttons
+        // Horizontally Scrollable Filter Chips Row & Batch Action Buttons
         Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
         ) {
             FilterChip(
                 selected = selectedFilter == "ALL",
                 onClick = { selectedFilter = "ALL" },
-                label = { Text("All (${installedApps.size})", fontSize = 11.sp) },
+                label = { Text("All (${installedApps.size})", fontSize = 12.sp) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = CyberCyan,
                     selectedLabelColor = Color.Black,
@@ -541,7 +558,7 @@ fun AppsLockScreen(
             FilterChip(
                 selected = selectedFilter == "LOCKED",
                 onClick = { selectedFilter = "LOCKED" },
-                label = { Text("Locked ($lockedCount)", fontSize = 11.sp) },
+                label = { Text("Locked ($lockedCount)", fontSize = 12.sp) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = CyberCyan,
                     selectedLabelColor = Color.Black,
@@ -553,7 +570,7 @@ fun AppsLockScreen(
             FilterChip(
                 selected = selectedFilter == "UNLOCKED",
                 onClick = { selectedFilter = "UNLOCKED" },
-                label = { Text("Unlocked", fontSize = 11.sp) },
+                label = { Text("Unlocked (${installedApps.size - lockedCount})", fontSize = 12.sp) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = CyberCyan,
                     selectedLabelColor = Color.Black,
@@ -565,7 +582,7 @@ fun AppsLockScreen(
             FilterChip(
                 selected = selectedFilter == "SENSITIVE",
                 onClick = { selectedFilter = "SENSITIVE" },
-                label = { Text("Sensitive", fontSize = 11.sp) },
+                label = { Text("Sensitive", fontSize = 12.sp) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = CyberCyan,
                     selectedLabelColor = Color.Black,
@@ -574,17 +591,12 @@ fun AppsLockScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.weight(1f))
-
             // Batch Lock Sensitive Shortcut
-            Text(
-                text = "Lock All Sensitive",
-                color = CyberCyan,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(RoundedCornerShape(8.dp))
                     .background(ContainerNavy)
+                    .border(1.dp, CyberCyan.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                     .clickable {
                         scope.launch(Dispatchers.IO) {
                             val sensitives = installedApps.filter { it.isSensitive }
@@ -602,9 +614,16 @@ fun AppsLockScreen(
                             }
                         }
                     }
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
                     .testTag("lock_all_sensitive_action")
-            )
+            ) {
+                Text(
+                    text = "Lock All Sensitive",
+                    color = CyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -652,7 +671,8 @@ fun AppsLockScreen(
                 contentPadding = PaddingValues(bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .testTag("installed_apps_lazy_column")
             ) {
                 items(
@@ -723,10 +743,9 @@ fun InstalledAppLockRow(
                     .clip(RoundedCornerShape(12.dp))
                     .background(ContainerNavy)
             ) {
-                if (app.icon != null) {
-                    val bitmap = remember(app.icon) { app.icon.toBitmap(96, 96) }
+                if (app.iconBitmap != null) {
                     Image(
-                        bitmap = bitmap.asImageBitmap(),
+                        bitmap = app.iconBitmap.asImageBitmap(),
                         contentDescription = app.appName,
                         modifier = Modifier
                             .size(38.dp)
